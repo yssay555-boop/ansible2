@@ -1,0 +1,7 @@
+# CrowdSec가 수집할 로그 소스 정의
+# - Nginx 컨테이너 로그를 호스트 디렉터리로 마운트하여 CrowdSec가 읽도록 구성합니다.
+filenames:
+  - /var/log/nginx/access.log
+  - /var/log/nginx/error.log
+labels:
+  type: nginx

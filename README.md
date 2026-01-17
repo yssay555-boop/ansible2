@@ -26,6 +26,95 @@
 git config --global user.name "당신의 이름 또는 닉네임"
 git config --global user.email "github에 등록된 이메일@example.com"
 ```
+---
+# Ansible 프로젝트에서 `Zone.Identifier` 파일 생성 방지 & 기존 파일 삭제 가이드
+
+`Zone.Identifier`는 Windows의 **Mark-of-the-Web(MOTW)** / **Attachment Manager**가 파일에 “인터넷에서 내려받은 파일” 같은 **영역(Zone) 정보**를 기록하면서 생기는 메타정보입니다.  
+Windows + WSL/공유폴더/NTFS 마운트 같은 환경에서는 이 정보가 리눅스 쪽에서 `*.Zone.Identifier` 또는 `*:Zone.Identifier` 같은 **파일 형태로 보이거나 생성**될 수 있습니다.
+
+아래는 **(1) 앞으로 생성되지 않게 막는 방법**과 **(2) 이미 생성된 파일을 삭제하는 방법**을 정리한 문서입니다.
+
+---
+
+## 1) 앞으로 생성되지 않게 막기 (원인별)
+
+### A. Windows(호스트)가 생성하는 경우 (가장 흔함: WSL/공유폴더/Windows에서 복사/다운로드)
+Windows에서 Attachment Manager가 Zone 정보를 저장하지 않도록 설정하면, 이후 새로 내려받는/복사하는 파일에 **Zone.Identifier가 더 이상 붙지 않도록** 할 수 있습니다.
+
+#### 1) 그룹 정책(gpedit.msc)
+- 경로:
+  - `사용자 구성 → 관리 템플릿 → Windows 구성 요소 → 첨부 파일 관리자`
+- 설정:
+  - **“파일 첨부에서 영역 정보 보존 안 함”** → **사용(Enabled)**
+
+#### 2) 레지스트리(그룹 정책이 없는 에디션 포함)
+- 키:
+  - `HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Attachments`
+- 값:
+  - `DWORD (32-bit) SaveZoneInformation = 1`  (영역 정보 저장 안 함)
+
+> 위 설정 후에는 Windows에서 새로 생성/다운로드/복사된 파일에 Zone 정보가 덜 붙습니다.
+
+---
+
+### B. 프로젝트가 NTFS로 마운트된 경로에 있을 때 (리눅스에서 NTFS 파티션/외장하드 작업)
+NTFS-3G 마운트 옵션에 따라 ADS(Alternate Data Streams)가 `:Zone.Identifier` 같은 형태로 **파일처럼 노출**될 수 있습니다.
+
+#### 1) 현재 마운트 옵션 확인
+```bash
+mount | grep -E 'ntfs|ntfs-3g'
+```
+
+#### 2) `/etc/fstab`에서 `streams_interface` 조정(예시)
+- ADS를 아예 안 보이게/막고 싶으면 `none`
+- ADS를 xattr로 매핑하려면 `xattr`
+
+```fstab
+UUID=XXXX  /mnt/data  ntfs-3g  defaults,streams_interface=none  0  0
+# 또는
+UUID=XXXX  /mnt/data  ntfs-3g  defaults,streams_interface=xattr 0  0
+```
+
+> 기존에 `streams_interface=windows` 형태라면 `file:Zone.Identifier`가 더 쉽게 드러날 수 있습니다.
+
+---
+
+## 2) 기존에 생성된 Zone.Identifier 파일 삭제 (리눅스)
+
+아래는 **Ansible 프로젝트 루트**에서 실행한다고 가정합니다.
+
+### (1) 삭제 대상 미리보기(추천)
+```bash
+cd /path/to/ansible-project
+
+find . -type f \(   -name '*Zone.Identifier' -o   -name '*:Zone.Identifier*' -o   -name '*Zone.Identifier:$DATA*' -o   -name '*.Zone.Identifier*' \) -print
+```
+
+### (2) 실제 삭제
+```bash
+find . -type f \(   -name '*Zone.Identifier' -o   -name '*:Zone.Identifier*' -o   -name '*Zone.Identifier:$DATA*' -o   -name '*.Zone.Identifier*' \) -print -delete
+```
+
+> `*:Zone.Identifier*` 패턴은 NTFS ADS가 “콜론 파일명”으로 보이는 케이스까지 같이 정리하기 위한 옵션입니다.
+
+---
+
+## 3) Git에 실수로 올라가지 않게 방지 (.gitignore)
+근본 차단은 아니지만, 리포지토리에 섞여 커밋되는 건 막아두는 게 좋습니다.
+
+`.gitignore`에 추가:
+```gitignore
+*Zone.Identifier*
+*:Zone.Identifier*
+```
+
+---
+
+## 요약
+- **생성을 근본적으로 막기(가장 흔한 케이스)**: Windows Attachment Manager 설정(그룹정책/레지스트리)
+- **NTFS 마운트에서 파일처럼 보이는 문제**: `streams_interface=none` 또는 `xattr` 검토
+- **이미 생긴 파일 정리**: `find ... -delete`로 프로젝트 내 일괄 삭제
+- **커밋 방지**: `.gitignore` 패턴 추가
 
 ---
 
@@ -216,7 +305,137 @@ ansible-playbook -i inventories/aws/aws_ec2.yml playbooks/21_post_provision_via_
 ```bash
 ansible-playbook playbooks/23_aws_cleanup.yml -e aws_region=ap-northeast-2 -e environment=dev
 ```
+---
+## 자세한 단계별 가이드는 `docs/`를 참고하세요.
+---
+
+### 구성:
+- **Trivy**: 컨테이너/이미지 취약점 스캐너 (리포트 생성)
+- **Docker Bench for Security**: 도커 호스트 보안 점검(베스트프랙티스 체크리스트)
+- **CrowdSec + Nginx(옵션)**: Nginx 로그를 기반으로 탐지/알림을 확인하는 실습
+
+> 실습 목적: “도커 기반 보안 도구를 Ansible로 배포/실행/결과물 생성”까지 한 번에 경험.
 
 ---
 
-자세한 단계별 가이드는 `docs/`를 참고하세요.
+## 0) 사전 준비
+
+- Linux(Ubuntu/Debian 권장)
+- Ansible 설치
+- (권장) sudo 권한
+
+### Ansible collection 설치
+본 랩은 `community.docker` collection을 사용합니다.
+
+```bash
+ansible-galaxy collection install -r requirements.yml
+```
+
+---
+
+## 1) Docker 설치 (필요한 경우만)
+
+Docker가 아직 없다면 아래 playbook을 실행하세요.
+
+```bash
+ansible-playbook playbooks/00_bootstrap.yml -K
+```
+
+- `-K`는 sudo 비밀번호 입력을 위해 필요할 수 있습니다.
+- 실행 후, 현재 사용자를 docker 그룹에 추가하므로 **재로그인**이 필요할 수 있습니다.
+
+---
+
+## Trivy(트리비)로 이미지 취약점 스캔
+
+기본 스캔 대상은 `nginx:latest` 입니다 (`group_vars/all.yml`에서 변경 가능).
+
+```bash
+ansible-playbook -i inventories/local/hosts.ini playbooks/91_trivy_scan.yml -K
+```
+
+결과물:
+- `/opt/security-lab/reports/` 아래에 리포트 저장
+  - `trivy-nginx_latest.json`
+  - `trivy-nginx_latest.txt`
+
+리포트를 빠르게 확인하려면:
+```bash
+ls -al /opt/security-lab/reports
+sed -n '1,120p' /opt/security-lab/reports/trivy-nginx_latest.txt
+```
+```
+sudo apt install xdg-utils
+xdg-open /opt/security-lab/reports/trivy-nginx_latest.html
+cd /opt/security-lab/reports
+python3 -m http.server 8000 --bind 0.0.0.0
+```
+---
+
+## 3) Docker Bench for Security로 호스트 점검
+
+```bash
+ansible-playbook playbooks/02_docker_bench.yml -K
+```
+
+결과물:
+- `/opt/security-lab/reports/docker-bench-YYYYMMDD-HHMMSS.txt`
+
+---
+
+## 4) (옵션) CrowdSec + Nginx 로그 기반 탐지 실습
+
+`group_vars/all.yml`의 `enable_crowdsec_lab: true`일 때 동작합니다.
+
+```bash
+ansible-playbook playbooks/03_crowdsec_nginx_lab.yml -K
+```
+
+### 4-1) 로그 생성(트래픽 발생)
+```bash
+curl -sS http://localhost:8080/
+curl -i  http://localhost:8080/notfound
+```
+
+조금 더 많이 찍고 싶으면:
+```bash
+for i in {1..50}; do curl -sS http://localhost:8080/notfound >/dev/null; done
+```
+
+### 4-2) CrowdSec 상태/지표 확인
+```bash
+docker exec -it lab-crowdsec cscli metrics
+docker exec -it lab-crowdsec cscli alerts list
+```
+
+> CrowdSec는 시나리오/컬렉션/파서 구성에 따라 탐지 결과가 달라집니다.  
+> 이 랩은 “로그를 읽고 상태/알림을 확인하는 흐름”을 익히는 데 초점을 둡니다.
+
+---
+
+## 커스터마이징 포인트
+
+### 스캔 대상 이미지 바꾸기
+`group_vars/all.yml`에서:
+```yaml
+scan_image: "alpine:3.21"
+```
+처럼 변경한 뒤 Trivy playbook을 재실행하세요.
+
+### 설치 경로 바꾸기
+`lab_root` 값을 바꾸면 `/opt/security-lab` 대신 다른 경로를 사용할 수 있습니다.
+
+---
+
+
+---
+
+## 빠른 실행 요약
+
+```bash
+ansible-galaxy collection install -r requirements.yml
+ansible-playbook playbooks/00_bootstrap.yml -K
+ansible-playbook playbooks/01_trivy_scan.yml -K
+ansible-playbook playbooks/02_docker_bench.yml -K
+ansible-playbook playbooks/03_crowdsec_nginx_lab.yml -K
+```

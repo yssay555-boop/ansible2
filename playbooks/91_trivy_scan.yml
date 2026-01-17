@@ -1,0 +1,75 @@
+---
+- name: "91) Trivy: Docker 이미지 취약점 스캔 + 리포트 생성 (JSON/TXT/HTML)"
+  hosts: localhost
+  connection: local
+  become: true
+
+  vars:
+    lab_root: /opt/security-lab
+    reports_dir: "{{ lab_root }}/reports"
+    scan_image: "nginx:latest"
+
+    # HTML 템플릿 (Trivy 공식 템플릿)
+    trivy_html_tpl_url: "https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl"
+    trivy_html_tpl_path: "{{ reports_dir }}/trivy-html.tpl"
+
+  tasks:
+    - name: Ensure reports directory exists
+      ansible.builtin.file:
+        path: "{{ reports_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Pull target image to scan
+      ansible.builtin.command: "docker pull {{ scan_image }}"
+      register: pull_out
+      changed_when: >
+        ('Downloaded newer image' in pull_out.stdout) or
+        ('Pull complete' in pull_out.stdout)
+
+    - name: Download Trivy HTML template
+      ansible.builtin.get_url:
+        url: "{{ trivy_html_tpl_url }}"
+        dest: "{{ trivy_html_tpl_path }}"
+        mode: "0644"
+
+    - name: Run Trivy scan (JSON report)
+      ansible.builtin.command: >
+        docker run --rm
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v {{ reports_dir }}:/reports
+        aquasec/trivy:latest
+        image --format json
+        -o /reports/trivy-{{ scan_image | regex_replace('[^a-zA-Z0-9_.-]', '_') }}.json
+        {{ scan_image }}
+      changed_when: true
+
+    - name: Run Trivy scan (table/text report)
+      ansible.builtin.command: >
+        docker run --rm
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v {{ reports_dir }}:/reports
+        aquasec/trivy:latest
+        image --format table
+        -o /reports/trivy-{{ scan_image | regex_replace('[^a-zA-Z0-9_.-]', '_') }}.txt
+        {{ scan_image }}
+      changed_when: true
+
+    - name: Run Trivy scan (HTML report)
+      ansible.builtin.command: >
+        docker run --rm
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v {{ reports_dir }}:/reports
+        aquasec/trivy:latest
+        image --format template --template "@/reports/trivy-html.tpl"
+        -o /reports/trivy-{{ scan_image | regex_replace('[^a-zA-Z0-9_.-]', '_') }}.html
+        {{ scan_image }}
+      changed_when: true
+
+    - name: Print where reports are saved
+      ansible.builtin.debug:
+        msg:
+          - "Trivy reports saved under: {{ reports_dir }}"
+          - "JSON: trivy-{{ scan_image | regex_replace('[^a-zA-Z0-9_.-]', '_') }}.json"
+          - "TXT : trivy-{{ scan_image | regex_replace('[^a-zA-Z0-9_.-]', '_') }}.txt"
+          - "HTML: trivy-{{ scan_image | regex_replace('[^a-zA-Z0-9_.-]', '_') }}.html"

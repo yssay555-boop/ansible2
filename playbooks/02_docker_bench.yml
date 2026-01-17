@@ -1,0 +1,26 @@
+---
+- name: "02) Docker Bench for Security: 도커 호스트 보안 베스트프랙티스 점검"
+  hosts: lab
+  become: true
+  tasks:
+    - name: Ensure reports directory exists
+      ansible.builtin.file:
+        path: "{{ reports_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Run docker-bench-security and save report
+      ansible.builtin.shell: |
+        set -euo pipefail
+        OUT="{{ reports_dir }}/docker-bench-$(date +%Y%m%d-%H%M%S).txt"
+        docker run --rm --net host --pid host --userns host           --cap-add audit_control           -e DOCKER_CONTENT_TRUST=1           -v /etc:/etc:ro           -v /usr/bin/containerd:/usr/bin/containerd:ro           -v /usr/bin/runc:/usr/bin/runc:ro           -v /usr/lib/systemd:/usr/lib/systemd:ro           -v /var/lib:/var/lib:ro           -v /var/run/docker.sock:/var/run/docker.sock:ro           -v /etc/docker:/etc/docker:ro           docker/docker-bench-security > "$OUT"
+        echo "$OUT"
+      args:
+        executable: /bin/bash
+      register: bench_out
+      changed_when: true
+
+    - name: Print report path
+      ansible.builtin.debug:
+        msg:
+          - "Docker Bench report saved: {{ bench_out.stdout }}"

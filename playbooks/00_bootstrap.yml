@@ -1,0 +1,65 @@
+---
+- name: "00) Bootstrap: docker 설치(우분투/데비안) + Ansible docker collection 사용 준비"
+  hosts: lab
+  become: true
+  vars:
+    docker_packages:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+  tasks:
+    - name: Create lab directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ lab_root }}"
+        - "{{ reports_dir }}"
+        - "{{ nginx_logs_dir }}"
+
+    - name: Install prerequisite packages (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: "{{ docker_packages }}"
+        state: present
+        update_cache: true
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Add Docker GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}/gpg
+        state: present
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ 'amd64' if ansible_facts.architecture in ['x86_64','amd64'] else ansible_facts.architecture }}] https://download.docker.com/linux/{{ ansible_facts.distribution | lower }} {{ ansible_facts.distribution_release }} stable"
+        state: present
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Install Docker Engine (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Ensure docker service is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Add current user to docker group (re-login required)
+      ansible.builtin.user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+        append: true
+      when: ansible_facts.os_family == "Debian"
