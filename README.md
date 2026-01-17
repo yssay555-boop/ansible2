@@ -1,4 +1,4 @@
-# Ansible 초급 → AWS(SSM) → Docker 운영(rolling/blue-green) 실무 레포
+# Ansible
 
 ## VSCode 에서 WSL 사용
 ![alt text](image.png)
@@ -16,7 +16,106 @@ git config --global user.name "당신의 이름 또는 닉네임"
 git config --global user.email "github에 등록된 이메일@example.com"
 ```
 
-이 레포는 **Ansible 초급자**가 다음까지 “레포 형태로” 실습하면서 익히도록 구성했습니다.
+---
+# Ansible 초급 → AWS → Docker 관리 학습 레포
+
+이 레포는 **Ansible 초급부터 시작해서**, 최종적으로는 **AWS 리소스 생성/관리**와 **Docker(엔진·컨테이너·이미지) 운영 자동화**까지 학습할 수 있도록 구성된 실습형 예제 모음입니다.
+
+## 목표
+- 인벤토리/변수/플레이북의 기본을 이해하고 실제로 실행
+- Role 기반 구조(재사용/표준화)를 익히고 템플릿/핸들러/태그를 적용
+- AWS 모듈(컬렉션)로 VPC/EC2/S3 등을 **코드로 생성/정리**
+- community.docker 모듈로 Docker 설치 및 컨테이너 운영 자동화
+
+---
+
+## 빠른 시작
+
+### 1) 준비물
+- Linux/WSL(권장), 또는 macOS
+- Python 3.9+
+- Ansible (ansible-core)
+- AWS 자격증명(Access Key / Secret Key 또는 SSO/프로파일)
+
+> Windows 단독(파워쉘)에서도 가능하지만, **WSL2(Ubuntu)** 환경이 가장 편합니다.
+
+### 2) 설치
+```bash
+cd ansible-aws-docker-labs
+./scripts/bootstrap.sh
+./scripts/check.sh
+```
+
+### 3) 기본 테스트
+```bash
+ansible -i inventories/local/hosts.ini local -m ping
+ansible-playbook playbooks/00_ping.yml
+```
+
+---
+
+## 학습 로드맵
+
+### A. Ansible 기초
+1. `docs/01_basics.md` : Ansible가 무엇이고, ad-hoc 명령/모듈 실행
+2. `docs/02_inventory_vars.md` : 인벤토리/변수/팩트/조건문
+3. `docs/03_playbooks_roles.md` : 플레이북 구조, Role로 분리
+4. `docs/04_templates_handlers.md` : Jinja2 템플릿, 핸들러, idempotent 개념
+5. `docs/05_vault_secrets.md` : Vault로 시크릿 관리
+
+### B. Docker 관리 자동화
+- `docs/09_docker_management.md`
+- `playbooks/10_docker_install.yml`, `playbooks/11_docker_run_nginx.yml`
+- `roles/docker_engine`
+
+### C. AWS 관리 자동화
+- `docs/06_awsoverview.md`, `docs/07_aws_ec2_vpc_s3_iam.md`, `docs/08_dynamic_inventory_aws.md`
+- `playbooks/20_aws_create_vpc.yml`, `21_aws_create_ec2.yml`, `22_aws_s3_bucket.yml`, `23_aws_cleanup.yml`
+
+---
+
+## 디렉터리 구조
+```
+ansible-aws-docker-labs/
+  ansible.cfg
+  requirements.yml
+  requirements.txt
+  inventories/
+  playbooks/
+  roles/
+  docs/
+  scripts/
+```
+
+---
+
+## 실행 예시 모음
+
+### Nginx 설치 (로컬)
+```bash
+ansible-playbook -i inventories/local/hosts.ini playbooks/02_nginx.yml
+```
+
+### Role 기반 웹서버 배포
+```bash
+ansible-playbook -i inventories/local/hosts.ini playbooks/03_role_web.yml
+```
+
+### Docker 호스트에 엔진 설치
+```bash
+ansible-playbook -i inventories/docker/hosts.ini playbooks/10_docker_install.yml
+```
+
+### AWS VPC + EC2 만들기
+```bash
+# AWS 자격 증명은 환경변수 또는 ~/.aws/credentials(프로파일)로 설정
+ansible-playbook playbooks/20_aws_create_vpc.yml -e aws_region=ap-northeast-2
+ansible-playbook playbooks/21_aws_create_ec2.yml -e aws_region=ap-northeast-2
+```
+
+> 비용이 발생할 수 있으니, 실습 후 `playbooks/23_aws_cleanup.yml`로 정리하세요.
+
+---
 
 - Ansible 기본(인벤토리/변수/템플릿/핸들러/Role)
 - **Docker 엔진 설치 + Compose 스택 배포**
