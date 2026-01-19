@@ -1,5 +1,251 @@
 # Ansible
 
+## 사전에 WSL(WSL2) 설치/관리 + 여러 리눅스 배포판 설치 + Docker Desktop(WSL2) 공유 정리
+
+> 기준: Windows 10/11에서 **WSL2**를 사용하는 일반적인 케이스  
+> PowerShell(관리자 권한)에서 실행해야 하는 명령은 ✅로 표시했습니다.
+
+---
+
+## 0) 빠른 결론 (Docker Desktop + WSL2)
+- **Docker Desktop + WSL2 백엔드 + WSL Integration 사용**이면  
+  → Windows와 WSL Linux는 **같은 Docker 엔진을 공유**하므로 **이미지/컨테이너가 공유**됩니다.
+- WSL Ubuntu 안에 **docker-ce를 별도로 설치**하고 그 안에서 `dockerd`를 따로 띄우면  
+  → Docker Desktop 엔진과 **분리**되어 **공유되지 않습니다.**
+
+---
+
+## 1) WSL/WSL2 설치 (가장 쉬운 방법)
+### 1-1) WSL 설치/기본 세팅 (권장)
+✅ **PowerShell(관리자)**:
+```powershell
+wsl --install
+```
+
+- 기본으로 Ubuntu가 함께 설치되는 경우가 많습니다.
+- 설치 후 재부팅이 필요할 수 있어요.
+
+### 1-2) WSL 상태/버전 확인
+```powershell
+wsl --status
+```
+
+### 1-3) WSL 업데이트 (커널 업데이트)
+✅ PowerShell(관리자):
+```powershell
+wsl --update
+```
+
+### 1-4) 기본 WSL 버전을 WSL2로 지정
+```powershell
+wsl --set-default-version 2
+```
+
+---
+
+## 2) 설치 가능한 리눅스 목록 조회 & 여러 배포판 설치
+### 2-1) 설치 가능한 배포판(온라인) 목록 보기
+```powershell
+wsl --list --online
+# 또는 축약
+wsl -l -o
+```
+
+### 2-2) 원하는 배포판 설치
+예: Ubuntu / Debian / Kali / openSUSE 등
+```powershell
+wsl --install -d Ubuntu
+wsl --install -d Debian
+wsl --install -d kali-linux
+```
+
+> 배포판 이름은 `wsl -l -o` 결과에 표시된 이름을 그대로 쓰면 됩니다.
+
+---
+
+## 3) 현재 설치된 WSL 배포판 목록 보기 (설치 목록)
+### 3-1) 설치된 배포판 목록
+```powershell
+wsl --list
+# 축약
+wsl -l
+```
+
+### 3-2) 설치된 배포판 + WSL 버전(1/2)까지 보기 (추천)
+```powershell
+wsl --list --verbose
+# 축약
+wsl -l -v
+```
+
+---
+
+## 4) 실행/접속/기본 배포판 관리
+### 4-1) 특정 배포판 실행(접속)
+```powershell
+wsl -d Ubuntu
+wsl -d Debian
+```
+
+### 4-2) 특정 배포판에서 특정 명령만 실행
+```powershell
+wsl -d Ubuntu -- uname -a
+wsl -d Debian -- cat /etc/os-release
+```
+
+### 4-3) 기본 배포판 지정
+```powershell
+wsl --set-default Ubuntu
+```
+
+### 4-4) 실행 중인 배포판 종료
+- 전체 WSL 종료:
+```powershell
+wsl --shutdown
+```
+
+- 특정 배포판만 종료:
+```powershell
+wsl --terminate Ubuntu
+```
+
+---
+
+## 5) WSL1 ↔ WSL2 변환/설정
+### 5-1) 특정 배포판을 WSL2로 변경
+```powershell
+wsl --set-version Ubuntu 2
+```
+
+### 5-2) 특정 배포판을 WSL1로 변경(특수 목적)
+```powershell
+wsl --set-version Ubuntu 1
+```
+
+---
+
+## 6) 배포판(리눅스) 삭제/백업/복원
+### 6-1) 배포판 완전 삭제(주의!)
+```powershell
+wsl --unregister Ubuntu
+```
+> ⚠️ 해당 배포판의 파일시스템/데이터가 모두 삭제됩니다.
+
+### 6-2) 배포판 백업(export)
+```powershell
+wsl --export Ubuntu C:\backup\ubuntu.tar
+```
+
+### 6-3) 배포판 복원(import) - 새 이름으로 가져오기
+```powershell
+wsl --import UbuntuRestored C:\WSL\UbuntuRestored C:\backup\ubuntu.tar --version 2
+```
+
+---
+
+## 7) Windows ↔ WSL 파일 경로/접근
+### 7-1) WSL에서 Windows 드라이브 접근
+- C드라이브:
+```bash
+cd /mnt/c
+```
+
+### 7-2) Windows 탐색기에서 WSL 파일 보기
+- 탐색기 주소창에 입력:
+```text
+\\wsl$\Ubuntu
+```
+
+### 7-3) 현재 WSL 디렉터리를 Windows 탐색기로 열기
+WSL(리눅스)에서:
+```bash
+explorer.exe .
+```
+
+---
+
+## 8) 네트워크/포트 관련 빠른 팁
+- WSL2는 내부적으로 가상 네트워크를 쓰므로 IP가 달라질 수 있어요.
+- 보통은 `localhost` 포트 포워딩이 동작하지만, 방화벽/보안 설정에 따라 예외가 있을 수 있습니다.
+- WSL에서 현재 IP 확인:
+```bash
+ip addr
+```
+
+---
+
+## 9) 자주 쓰는 “운영” 명령 모음 (치트시트)
+### 9-1) 현재 설치/실행 현황 빠르게 보기
+```powershell
+wsl -l -v
+wsl --status
+```
+
+### 9-2) 특정 배포판에서 패키지 업데이트 (Ubuntu/Debian)
+WSL(리눅스) 안에서:
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
+
+### 9-3) openSUSE 계열 예시
+```bash
+sudo zypper refresh
+sudo zypper update -y
+```
+
+---
+
+## 10) Docker Desktop + WSL2 “공유 엔진” 확인
+### 10-1) WSL Ubuntu에서 Docker Desktop 엔진을 보는지 확인
+WSL Ubuntu에서:
+```bash
+docker info | grep -E "Server Version|Operating System"
+```
+
+- Docker Desktop(WSL2) 관련 정보가 나오면 보통 **공유 엔진**입니다.
+
+### 10-2) Windows에서도 같은지 확인
+PowerShell에서:
+```powershell
+docker images
+docker ps
+```
+
+---
+
+## 11) 흔한 문제 2가지
+### 11-1) “WSL이 설치는 됐는데 배포판이 없음”
+- `wsl -l -o`로 목록 확인 후 `wsl --install -d <배포판명>` 실행
+
+### 11-2) Docker 이미지가 공유가 안 되는 것 같음
+- WSL Ubuntu에 `docker-ce`를 직접 설치해서 엔진을 따로 돌리고 있으면 공유가 안 됩니다.
+- Docker Desktop 설정에서:
+  - WSL2 백엔드 사용
+  - WSL Integration에서 해당 배포판(예: Ubuntu) 체크
+를 확인하세요.
+
+---
+
+## 12) (선택) 성능/리소스 튜닝 팁
+WSL2 리소스 제한은 `C:\Users\<사용자>\.wslconfig`로 조정할 수 있습니다. (파일이 없으면 생성)
+
+예시:
+```ini
+[wsl2]
+memory=8GB
+processors=4
+swap=4GB
+```
+
+적용:
+```powershell
+wsl --shutdown
+```
+후 다시 WSL 실행하면 적용됩니다.
+
+---
+
 ## 환경 준비
 - Linux/WSL(권장), 또는 macOS
 - Python 3.9+
