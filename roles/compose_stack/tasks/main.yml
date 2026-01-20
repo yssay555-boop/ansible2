@@ -1,19 +1,38 @@
----
 - name: Ensure compose root exists
   ansible.builtin.file:
     path: "{{ compose_project_root }}"
     state: directory
     mode: '0755'
 
-- name: Copy stack files
+- name: Copy stack files (excluding nginx.conf)
   ansible.builtin.copy:
-    src: "{{ stack_src_dir }}/"
+    src: "{{ stack_src_dir }}/sample-webapp-bg/"
     dest: "{{ stack_dest_dir }}/"
     mode: '0644'
+    remote_src: no
 
-- name: Compose up
+- name: Copy nginx.conf
+  ansible.builtin.copy:
+    src: "{{ stack_src_dir }}/sample-webapp-bg/nginx.conf"
+    dest: "{{ stack_dest_dir }}/nginx.conf"
+    mode: '0644'
+
+- name: Compose up sample-webapp
   community.docker.docker_compose_v2:
-    project_src: "{{ stack_dest_dir }}"
+    project_src: "/opt/compose/sample-webapp"
+    state: present
+
+- name: Compose up sample-webapp-bg
+  community.docker.docker_compose_v2:
+    project_src: "/opt/compose/sample-webapp-bg"
+    state: present
+    profiles:
+      - blue
+      - green
+
+- name: Compose up sample-webapp-db
+  community.docker.docker_compose_v2:
+    project_src: "/opt/compose/sample-webapp-db"
     state: present
 
 - name: Wait for healthcheck

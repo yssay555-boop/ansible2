@@ -14,6 +14,13 @@
     # 조회 예: aws ec2 describe-images --owners amazon --filters 'Name=name,Values=al2023-ami-*-x86_64' --region ap-northeast-2
     ami_id: "ami-xxxxxxxxxxxxxxxxx"
     key_name: "my-keypair"   # 본인 키페어 이름
+    
+    aws_region: ap-northeast-2
+    
+    aws_tags:
+      Project: ansible-lab
+      Environment: dev
+      ManagedBy: ansible
 
   tasks:
     - name: Create EC2 instance

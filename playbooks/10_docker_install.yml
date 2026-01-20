@@ -1,6 +1,7 @@
 ---
 - name: 10) Install Docker Engine
   hosts: docker_hosts
+  become: true
   gather_facts: true
   roles:
     - role: docker_engine

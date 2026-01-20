@@ -1,0 +1,4 @@
+aws_region: ap-northeast-2
+vpc_id: vpc-087940681c57acc6d
+subnet_id: subnet-03bd5aa26de063f74
+sg_id: sg-0a4e2e8f8e217c1ac

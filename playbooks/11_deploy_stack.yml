@@ -2,5 +2,13 @@
 - name: Deploy compose stack
   hosts: app_hosts
   become: true
+  vars:
+    compose_project_root: "/opt/compose"
+    stack_src_dir: "/home/lys/ansible2/stacks"
+    stack_dest_dir: "/opt/compose/sample-webapp-bg"
+    healthcheck_url: "http://localhost:8080/health"
+    healthcheck_retries: 10
+    healthcheck_delay: 5
+
   roles:
     - compose_stack

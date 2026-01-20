@@ -11,6 +11,11 @@
     subnet_cidr: 10.10.1.0/24
     sg_name: ansible-lab-sg
 
+    aws_tags:
+    Name: ansible-lab
+    Environment: dev
+    ManagedBy: ansible
+
   tasks:
     - name: Create VPC
       amazon.aws.ec2_vpc_net:

@@ -15,3 +15,12 @@ aws_region: ap-northeast-2
 aws_tags:
   Project: ansible-labs
   ManagedBy: ansible
+
+scan_image: "alpine:3.21"
+
+compose_project_root: /opt/compos
+
+vars:
+  healthcheck_url: "http://localhost:8080/health"
+  healthcheck_retries: 10
+  healthcheck_delay: 5

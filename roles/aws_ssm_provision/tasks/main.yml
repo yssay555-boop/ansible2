@@ -1,13 +1,16 @@
 ---
 - name: Lookup latest Ubuntu 22.04 AMI from SSM Parameter Store
-  amazon.aws.aws_ssm_parameter_store:
-    name: "/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
-    region: "{{ aws_region }}"
-  register: ubuntu_ami
+  set_fact:
+    ubuntu_ami_id: >-
+      {{ lookup(
+        'amazon.aws.ssm_parameter',
+        '/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id',
+        region=aws_region
+      ) }}
 
 - name: Create VPC
   amazon.aws.ec2_vpc_net:
-    name: "{{ name_prefix }}-{{ environment }}-vpc"
+    name: "{{ name_prefix }}-{{ env_name }}-vpc"
     cidr_block: "{{ vpc_cidr }}"
     region: "{{ aws_region }}"
     tags: "{{ tag_base | default({}) }}"
@@ -45,7 +48,7 @@
 
 - name: Create security group (NO SSH)
   amazon.aws.ec2_security_group:
-    name: "{{ name_prefix }}-{{ environment }}-sg"
+    name: "{{ name_prefix }}-{{ env_name }}-sg"
     description: "Allow app ports (no SSH)"
     vpc_id: "{{ vpc.vpc.id }}"
     region: "{{ aws_region }}"
@@ -63,46 +66,41 @@
 
 - name: Ensure IAM role for SSM exists
   amazon.aws.iam_role:
-    name: "{{ name_prefix }}-{{ environment }}-ec2-ssm-role"
+    name: "{{ name_prefix }}-{{ env_name }}-ec2-ssm-role"
     state: present
+    region: "{{ aws_region }}"
     assume_role_policy_document: |
       {
         "Version": "2012-10-17",
         "Statement": [
           {
             "Effect": "Allow",
-            "Principal": {"Service": "ec2.amazonaws.com"},
+            "Principal": { "Service": "ec2.amazonaws.com" },
             "Action": "sts:AssumeRole"
           }
         ]
       }
-  register: ssm_role
-
-- name: Attach AmazonSSMManagedInstanceCore policy
-  amazon.aws.iam_managed_policy:
-    iam_type: role
-    iam_name: "{{ name_prefix }}-{{ environment }}-ec2-ssm-role"
-    policy_arn: arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-    state: present
+    managed_policies:
+      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
 
 - name: Ensure instance profile exists
   amazon.aws.iam_instance_profile:
-    name: "{{ name_prefix }}-{{ environment }}-instance-profile"
+    name: "{{ name_prefix }}-{{ env_name }}-instance-profile"
     state: present
-    roles:
-      - "{{ name_prefix }}-{{ environment }}-ec2-ssm-role"
+    region: "{{ aws_region }}"
+    role: "{{ name_prefix }}-{{ env_name }}-ec2-ssm-role"
 
 - name: Launch EC2 instances
   amazon.aws.ec2_instance:
-    name: "{{ name_prefix }}-{{ environment }}-app"
+    name: "{{ name_prefix }}-{{ env_name }}-app"
     region: "{{ aws_region }}"
-    image_id: "{{ ubuntu_ami.value }}"
+    image_id: "{{ ubuntu_ami_id }}"
     instance_type: "{{ instance_type }}"
     network:
       subnet_id: "{{ subnet.subnet.id }}"
       assign_public_ip: true
       security_group_id: "{{ sg.group_id }}"
-    iam_instance_profile: "{{ name_prefix }}-{{ environment }}-instance-profile"
+    iam_instance_profile: "{{ name_prefix }}-{{ env_name }}-instance-profile"
     tags: "{{ tag_base | default({}) | combine({'Name': name_prefix ~ '-' ~ environment ~ '-app'}) }}"
     wait: true
     count: "{{ instance_count }}"

@@ -9,7 +9,7 @@
     <ul>
       <li>host: {{ inventory_hostname }}</li>
       <li>user: {{ app_user }}</li>
-      <li>time: {{ ansible_date_time.iso8601 | default('') }}</li>
+      <li>time: {{ ansible_facts["date_time"]["iso8601"] | default("") }}</li>
     </ul>
   </body>
 </html>

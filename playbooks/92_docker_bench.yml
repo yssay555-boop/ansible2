@@ -21,12 +21,10 @@
         state: directory
         mode: "0755"
 
-    # ✅ 1단계: timestamp 먼저 생성 (같은 task 안에서 참조 금지)
     - name: Freeze timestamp once
       ansible.builtin.set_fact:
         bench_ts: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
 
-    # ✅ 2단계: timestamp 기반 경로 생성
     - name: Set report paths using frozen timestamp
       ansible.builtin.set_fact:
         raw_path: "{{ reports_dir }}/docker-bench-{{ bench_ts }}.raw.txt"
@@ -48,7 +46,7 @@
         ('Downloaded newer image' in pull_out.stdout) or
         ('Pull complete' in pull_out.stdout)
 
-    - name: Run Docker Bench (RAW with ANSI colors)
+    - name: Run Docker Bench (RAW with ANSI colors, ignore failures)
       ansible.builtin.shell: |
         set -euo pipefail
         docker run --rm \
@@ -61,10 +59,12 @@
           -v /var/run/docker.sock:/var/run/docker.sock:ro \
           -v /usr/lib/systemd:/usr/lib/systemd:ro \
           -v /etc:/etc:ro \
-          {{ bench_image }} 2>&1 | tee "{{ raw_path }}"
+          {{ bench_image }} 2>&1 | tee "{{ raw_path }}" || true
       args:
         executable: /bin/bash
+      become: yes
       changed_when: true
+      ignore_errors: yes
 
     - name: Stat RAW
       ansible.builtin.stat:
