@@ -3,7 +3,7 @@
   hosts: local
   gather_facts: false
   vars:
-    app_name: learning-app
+    app_name: learning-app-test
     app_ports:
       - 8080
       - 9090

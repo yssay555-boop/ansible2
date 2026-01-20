@@ -3,7 +3,7 @@
   hosts: local
   gather_facts: false
   vars:
-    learning_dir: /tmp/ansible-learning
+    learning_dir: /tmp/ansible-learning2
     sample_files:
       - name: alpha.txt
         enabled: true
